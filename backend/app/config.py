@@ -17,11 +17,18 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
 
     # --- Detector engine -------------------------------------------------
-    # Which zero-shot detector backend to load.
-    #   "lapd"          -> LAPD (alignment-imprint; needs base+aligned pair)
-    #   "fast_detectgpt"-> Fast-DetectGPT fallback (single model pair)
+    # Which detector backend to use.
+    #   "pangram"       -> hosted commercial API (BEST accuracy, no GPU/CPU
+    #                      needed locally — proxies to Pangram's servers)
+    #   "lapd"          -> LAPD (alignment-imprint; needs base+aligned pair + GPU)
+    #   "fast_detectgpt"-> Fast-DetectGPT fallback (single model pair + GPU)
     #   "stub"          -> deterministic heuristic, NO GPU (CI / dev only)
     detector_engine: str = "stub"
+
+    # Pangram hosted API (detector_engine="pangram"). Key comes from the
+    # environment — never hard-code it. Get one at pangram.com.
+    pangram_api_key: str = ""
+    pangram_model: str = "default"
 
     # Base + aligned model pair for LAPD / Fast-DetectGPT.
     # Small pair chosen so it fits a free 16GB T4.

@@ -1,10 +1,21 @@
-/* Darren Ai front-end. Talks to the backend API.
+/* Darren Ai front-end.
+   Detection strategy (in order):
+     1. Local/remote backend API (LAPD / Pangram / whatever is configured)
+     2. In-browser model (Transformers.js) — used automatically when no
+        backend is reachable, e.g. on static GitHub Pages hosting.
    API base resolves automatically: same-origin on web, or a configured host
    for the desktop/android wrappers (window.DARREN_API). */
 const API = (new URLSearchParams(location.search).get("api")
   || window.DARREN_API || "").replace(/\/$/, "");
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+let browserEngine = null;      // lazily imported module
+let backendAvailable = null;   // null=unknown, true/false
+async function getBrowserEngine() {
+  if (!browserEngine) browserEngine = await import("./engine-browser.js");
+  return browserEngine;
+}
 
 /* ---------- theme ---------- */
 const root = document.documentElement;
@@ -91,26 +102,58 @@ $("#detectBtn").addEventListener("click", async () => {
   if (countWords(text) < 5) return toast("Add some text first");
   busy($("#detectBtn"), true, "Detecting…");
   try {
-    const res = await api("/detect", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const d = await res.json();
-    setGauge(d.score);
-    $("#verdictText").textContent = d.verdict.replace(/_/g, " ");
-    $("#mEngine").textContent = d.engine;
-    $("#mConf").textContent = d.confidence;
-    const flagged = (d.spans || []).filter(s => s.flagged).length;
-    $("#mFlag").textContent = (d.spans || []).length ? `${flagged}/${d.spans.length}` : "—";
-
-    const cav = $("#caveats");
-    if (d.caveats?.length) { cav.innerHTML = "<ul>" + d.caveats.map(c => `<li>${c}</li>`).join("") + "</ul>"; cav.hidden = false; }
-    else cav.hidden = true;
-
-    renderHeat(d.spans || []);
-  } catch (e) { toast("Error: " + e.message); }
-  finally { busy($("#detectBtn"), false, "Detect AI"); }
+    const d = await runDetect(text);
+    renderDetect(d);
+  } catch (e) {
+    toast("Error: " + e.message);
+  } finally {
+    busy($("#detectBtn"), false, "Detect AI");
+  }
 });
+
+/** Try the backend; if it isn't reachable, fall back to in-browser inference. */
+async function runDetect(text) {
+  if (backendAvailable !== false) {
+    try {
+      const res = await api("/detect", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      backendAvailable = true;
+      updateEnginePill("backend");
+      return await res.json();
+    } catch (e) {
+      backendAvailable = false;
+      console.warn("Backend unavailable, using in-browser engine:", e.message);
+      toast("Backend offline — running on-device model", 3200);
+    }
+  }
+
+  // in-browser fallback (no server needed)
+  const be = await getBrowserEngine();
+  const d = await be.detect(text, {
+    onProgress: (msg, pct) => {
+      busy($("#detectBtn"), true, pct ? `Downloading model ${pct}%` : msg);
+    },
+  });
+  updateEnginePill("browser", d.backend);
+  return d;
+}
+
+function renderDetect(d) {
+  setGauge(d.score);
+  $("#verdictText").textContent = (d.verdict || "").replace(/_/g, " ");
+  $("#mEngine").textContent = d.engine;
+  $("#mConf").textContent = d.confidence;
+  const flagged = (d.spans || []).filter(s => s.flagged).length;
+  $("#mFlag").textContent = (d.spans || []).length ? `${flagged}/${d.spans.length}` : "—";
+
+  const cav = $("#caveats");
+  if (d.caveats?.length) { cav.innerHTML = "<ul>" + d.caveats.map(c => `<li>${c}</li>`).join("") + "</ul>"; cav.hidden = false; }
+  else cav.hidden = true;
+
+  renderHeat(d.spans || []);
+}
 
 function renderHeat(spans) {
   const card = $("#heatCard"), heat = $("#heat");
@@ -195,10 +238,26 @@ $("#copyBtn").addEventListener("click", async () => {
 });
 
 /* ---------- engine badge ---------- */
+function updateEnginePill(kind, backendName) {
+  const pill = $("#enginePill");
+  if (kind === "backend") {
+    pill.textContent = "engine: server";
+    pill.title = "Detection runs on the Darren Ai backend.";
+  } else {
+    pill.textContent = `engine: on-device${backendName ? " (" + backendName + ")" : ""}`;
+    pill.title = "Detection runs entirely in your browser — no server, your text never leaves this device.";
+  }
+}
+
 (async () => {
   try {
     const d = await (await api("/health")).json();
+    backendAvailable = true;
     $("#enginePill").textContent = `engine: ${d.engine}`;
-    if (d.engine === "stub") $("#enginePill").title = "Stub engine active — deploy the GPU backend for LAPD.";
-  } catch { $("#enginePill").textContent = "engine: offline"; }
+    if (d.engine === "stub") $("#enginePill").title = "Stub engine active — deploy a real backend or use the on-device model.";
+  } catch {
+    backendAvailable = false;
+    updateEnginePill("browser");
+    $("#enginePill").title = "No backend reachable — the on-device model will run when you click Detect.";
+  }
 })();
