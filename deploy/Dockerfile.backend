@@ -1,0 +1,18 @@
+# Darren Ai backend — CPU-capable image (stub engine works with no GPU).
+# For GPU hosts, base on an nvidia/cuda image and install a CUDA torch build.
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl build-essential && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+# CPU torch keeps the image small; GPU hosts override with a CUDA wheel.
+RUN pip install --index-url https://download.pytorch.org/whl/cpu torch \
+    && pip install -r requirements.txt
+
+COPY backend/app ./app
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

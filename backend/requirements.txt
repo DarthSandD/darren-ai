@@ -1,0 +1,22 @@
+# Darren Ai backend — core API
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+httpx==0.28.1
+numpy==2.2.1
+
+# Detection / humanizer engines (installed on the GPU host only)
+# torch is installed separately per-CUDA; see deploy/*/Dockerfile
+torch>=2.4.0
+transformers>=4.44.0
+accelerate>=0.33.0
+sentencepiece>=0.2.0
+protobuf>=4.25.0
+
+# Optional: DIPPER paraphraser backend
+# (pulls google/t5-v1_1-xxl tokenizer + kalpeshk2011/dipper-paraphraser-xxl)
+
+# Dev/test
+pytest==8.3.4

@@ -1,0 +1,23 @@
+{
+  "name": "darrenai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Darren Ai — AI text detector & humanizer (web / desktop / android)",
+  "scripts": {
+    "dev": "npx --yes serve web -l 5173",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@tauri-apps/cli": "^2.1.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0"
+  }
+}

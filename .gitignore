@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Env / secrets
+.env
+*.local
+
+# Tauri / Capacitor build output
+src-tauri/target/
+android/
+ios/
+
+# OS
+.DS_Store
+Thumbs.db
