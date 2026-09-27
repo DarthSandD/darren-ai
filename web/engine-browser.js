@@ -21,6 +21,41 @@
 const MODEL_ID = "onnx-community/tmr-ai-text-detector-ONNX";
 const TRANSFORMERS_CDN = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.5";
 
+/** Inject an import map so transformers.js resolves bare imports locally. */
+function injectLocalImportMap() {
+  const head = document.head;
+  const prev = head.querySelector('script[type="importmap"]');
+  if (prev) prev.remove();
+  const map = {
+    "imports": {
+      "onnxruntime-common": `${LOCAL_BASE}onnxruntime-common/index.js`,
+      "onnxruntime-web":     `${LOCAL_BASE}onnxruntime-web.mjs`,
+    }
+  };
+  const script = document.createElement("script");
+  script.type = "importmap";
+  script.textContent = JSON.stringify(map);
+  head.appendChild(script);
+}
+
+// When the app is packaged (Android/desktop) or served from a copy that ships
+// the model, everything is loaded from local files — no network at all.
+// We probe for the bundled model at startup and switch to it if found.
+const LOCAL_BASE = "./vendor/";
+const LOCAL_MODEL = "./models/tmr-ai-text-detector";
+let _useLocal = null; // null = unknown
+
+async function detectLocalBundle() {
+  if (_useLocal !== null) return _useLocal;
+  try {
+    const r = await fetch(`${LOCAL_MODEL}/config.json`, { method: "HEAD" });
+    _useLocal = r.ok;
+  } catch {
+    _useLocal = false;
+  }
+  return _useLocal;
+}
+
 let _classifier = null;
 let _backend = null;
 let _loading = null;
@@ -61,8 +96,22 @@ export async function load(onProgress = () => {}) {
 
   _loading = (async () => {
     onProgress("Loading detector engine…", 0);
-    const { pipeline, env } = await import(TRANSFORMERS_CDN);
-    env.allowLocalModels = false;
+    const useLocal = await detectLocalBundle();
+
+    // Library: bundled copy when packaged, CDN otherwise.
+    const libUrl = useLocal ? `${LOCAL_BASE}transformers.web.js` : TRANSFORMERS_CDN;
+    if (useLocal) injectLocalImportMap();
+    const { pipeline, env } = await import(libUrl);
+
+    if (useLocal) {
+      // Fully offline: point ORT at the bundled wasm and the local model dir.
+      env.allowRemoteModels = false;
+      env.allowLocalModels = true;
+      env.localModelPath = "./models/";
+      env.backends.onnx.wasm.wasmPaths = LOCAL_BASE;
+    } else {
+      env.allowLocalModels = false;
+    }
 
     const progress_callback = (info) => {
       if (info.status === "progress" && info.total) {
@@ -72,17 +121,19 @@ export async function load(onProgress = () => {}) {
       }
     };
 
+    const modelRef = useLocal ? "tmr-ai-text-detector" : MODEL_ID;
+
     // 1) try WebGPU (fast) — 2) fall back to WASM (universal)
     try {
-      _classifier = await pipeline("text-classification", MODEL_ID, {
+      _classifier = await pipeline("text-classification", modelRef, {
         device: "webgpu",
-        dtype: "q4",
+        dtype: useLocal ? "q8" : "q4",
         progress_callback,
       });
       _backend = "webgpu";
     } catch (e) {
       console.warn("WebGPU unavailable, using WASM:", e?.message || e);
-      _classifier = await pipeline("text-classification", MODEL_ID, {
+      _classifier = await pipeline("text-classification", modelRef, {
         device: "wasm",
         dtype: "q8",
         progress_callback,

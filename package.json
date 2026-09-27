@@ -14,10 +14,12 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",
+    "@huggingface/transformers": "^3.7.5",
     "@tauri-apps/cli": "^2.1.0"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",
-    "@capacitor/core": "^6.2.0"
+    "@capacitor/core": "^6.2.0",
+    "onnxruntime-web": "^1.30.0"
   }
 }
