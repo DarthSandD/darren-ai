@@ -1,0 +1,7 @@
+{
+  "appId": "com.darrenai.app",
+  "appName": "Darren Ai",
+  "webDir": "web",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false }
+}

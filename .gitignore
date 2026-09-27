@@ -23,3 +23,11 @@ ios/
 # OS
 .DS_Store
 Thumbs.db
+
+# Android build output & local config
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
