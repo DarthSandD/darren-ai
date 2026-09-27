@@ -17,7 +17,6 @@ build/
 
 # Tauri / Capacitor build output
 src-tauri/target/
-android/
 ios/
 
 # OS
