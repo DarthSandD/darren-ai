@@ -25,6 +25,20 @@ let _classifier = null;
 let _backend = null;
 let _loading = null;
 
+/**
+ * Start loading the model in the background, before the user clicks anything.
+ * Transformers.js stores model files in the browser's Cache Storage, so:
+ *   - first visit:  downloads once (progress shown), then cached on disk
+ *   - every revisit: loaded from cache — effectively instant, still offline-capable
+ * This makes detection feel immediate without any server or cost.
+ */
+export function warmup(onProgress = () => {}) {
+  // Defer so it never competes with first paint.
+  const go = () => load(onProgress).catch(() => {});
+  if (typeof requestIdleCallback === "function") requestIdleCallback(go, { timeout: 3000 });
+  else setTimeout(go, 1200);
+}
+
 /** Split text into sentence-ish spans for the heatmap. */
 export function splitSentences(text) {
   const out = [];

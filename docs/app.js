@@ -258,6 +258,20 @@ function updateEnginePill(kind, backendName) {
   } catch {
     backendAvailable = false;
     updateEnginePill("browser");
-    $("#enginePill").title = "No backend reachable — the on-device model will run when you click Detect.";
+    $("#enginePill").title = "No backend — the on-device model runs in your browser.";
+    // No server available: start warming the in-browser model immediately so
+    // the first Detect click is instant. Files are cached after the first load.
+    try {
+      const be = await getBrowserEngine();
+      be.warmup((msg, pct) => {
+        const pill = $("#enginePill");
+        if (pct != null && pct < 100) {
+          pill.textContent = `engine: on-device — loading ${pct}%`;
+        } else if (pct === 100 || msg === "Model ready") {
+          updateEnginePill("browser", be.backend());
+          pill.textContent = `engine: on-device (ready)`;
+        }
+      });
+    } catch { /* ignore — model loads on first click instead */ }
   }
 })();
