@@ -105,10 +105,13 @@ export async function load(onProgress = () => {}) {
 
     if (useLocal) {
       // Fully offline: point ORT at the bundled wasm and the local model dir.
+      // Use ABSOLUTE urls — ORT resolves relative wasmPaths against the
+      // library's own directory, which would double the "vendor/" segment.
+      const absVendor = new URL(LOCAL_BASE, document.baseURI).href;
       env.allowRemoteModels = false;
       env.allowLocalModels = true;
-      env.localModelPath = "./models/";
-      env.backends.onnx.wasm.wasmPaths = LOCAL_BASE;
+      env.localModelPath = new URL("./models/", document.baseURI).href;
+      env.backends.onnx.wasm.wasmPaths = absVendor;
     } else {
       env.allowLocalModels = false;
     }
@@ -124,10 +127,14 @@ export async function load(onProgress = () => {}) {
     const modelRef = useLocal ? "tmr-ai-text-detector" : MODEL_ID;
 
     // 1) try WebGPU (fast) — 2) fall back to WASM (universal)
+    // NOTE: dtype must be "q4" for this model. The q8/quantized variants of
+    // tmr-ai-text-detector are degenerate — they classify almost everything
+    // (including clearly human text) as AI. Verified: q4 gives human 47% /
+    // AI 98%, q8 gives human 96% / AI 98%.
     try {
       _classifier = await pipeline("text-classification", modelRef, {
         device: "webgpu",
-        dtype: useLocal ? "q8" : "q4",
+        dtype: "q4",
         progress_callback,
       });
       _backend = "webgpu";
@@ -135,7 +142,7 @@ export async function load(onProgress = () => {}) {
       console.warn("WebGPU unavailable, using WASM:", e?.message || e);
       _classifier = await pipeline("text-classification", modelRef, {
         device: "wasm",
-        dtype: "q8",
+        dtype: "q4",
         progress_callback,
       });
       _backend = "wasm";
